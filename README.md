@@ -1,6 +1,6 @@
 **MIDI to keyboard mapper**
 
-![Build Status](https://travis-ci.com/k5md/M2KB.svg?branch=master)](https://travis-ci.com/k5md/M2KB)
+[![Build Status](https://travis-ci.com/k5md/M2KB.svg?branch=master)](https://travis-ci.com/k5md/M2KB)
 
 ## About
 This program allows to map MIDI-keys to keyboard keys, i.e one's pressing a key on MIDI-keyboard triggers mapped keypress on a PC-keyboard. I've essentially written this tool for OSU!Mania, since it doesn't support MIDI input devices.
