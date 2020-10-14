@@ -6,7 +6,7 @@
 This program allows to map MIDI-keys to keyboard keys, i.e one's pressing a key on MIDI-keyboard triggers mapped keypress on a PC-keyboard. I've essentially written this tool for OSU!Mania, since it doesn't support MIDI input devices.
 
 ## Usage
-![M2KB.gif](https://s3.gifyu.com/images/M2KB.gif)
+[![M2KB763d538ac10b8bf0.gif](https://s3.gifyu.com/images/M2KB763d538ac10b8bf0.gif)](https://gifyu.com/image/kVFd)
 
 Plug in your MIDI-keyboard or whatever MIDI-, run M2KB, if you don't have it configured previously, map midi keys to keyboard by pressing KB key, then MIDI one, press ESC, config will be saved in keymap.cfg in the program directory, so that you won't have to remap keys everytime you run the program, then M2KB enters mapping mode.
 
