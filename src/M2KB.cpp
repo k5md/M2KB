@@ -242,7 +242,6 @@ int main() {
     while(true) {
         int c = _getch();
         if (c == VK_ESCAPE) break;
-        if (c == 'q') break;
     }
 
     keymapper.~Keymapper();

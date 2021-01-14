@@ -1,4 +1,4 @@
-FROM ubuntu
+FROM ubuntu:bionic-20190204
 USER root
 RUN apt-get update -y && \
     apt-get install -y \
