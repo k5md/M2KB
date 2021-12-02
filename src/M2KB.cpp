@@ -6,6 +6,7 @@
 #include <locale.h>
 #include <curses.h>
 #include <string.h>
+#include <sstream>
 
 #pragma comment(lib, "winmm.lib")
 
@@ -133,16 +134,14 @@ struct Keymapper {
 
         int numDevs = midiInGetNumDevs();
         if (numDevs == 0) {
-            ui.print("No MIDI-devices detected.");
-            std::cin.ignore();
-            throw std::invalid_argument("No MIDI-devices detected.");
-            
+            ui.print("No MIDI-devices detected");
+            throw std::invalid_argument("No MIDI-devices detected");
+
             return;
         }
+        
         if (numDevs > 1) {
-            ui.print("Multiple MIDI-devices detected.");
-            ui.print("Select a device number:");
-
+            ui.print("Multiple MIDI-devices detected");
             MIDIINCAPS cur;
             for (size_t i=0; i<numDevs; i++) {
                 midiInGetDevCaps(i, &cur, sizeof(MIDIINCAPS));
@@ -150,8 +149,23 @@ struct Keymapper {
             }
 
             int choice = -1;
-            while (choice > numDevs || choice < 0)
-                std::cin >> choice;
+            int input;
+            int selectedNumber;
+            std::stringstream inputStream;
+            while (choice >= numDevs || choice < 0) {
+                ui.print("Enter valid device number: ");
+                choice = -1;
+                inputStream.clear();
+                inputStream.str("");
+                while((input = _getch()) != VK_RETURN) {
+                    selectedNumber = input - '0';
+                    if (selectedNumber < 0 || selectedNumber > 9) continue;
+                    inputStream << std::to_string(selectedNumber);
+                    ui.printchars(std::to_string(selectedNumber).c_str());
+                }
+                inputStream >> choice;
+            }
+
             currentDevice = choice;
         }
 
@@ -230,9 +244,9 @@ int main() {
     keymapper.printConfig();
     keymapper.listen();
 
-    ui.print("Reassign mappings? (Y/N)");
-    char reassign = std::cin.get();
-    if (reassign == 'Y') {
+    ui.print("Reassign mappings? Type \"Y\" or \"y\" to confirm");
+    char reassign = _getch();
+    if (reassign == 'Y' || reassign == 'y') {
         keymapper.reassignKeymap();
     }
 
