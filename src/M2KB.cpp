@@ -35,13 +35,17 @@ void CALLBACK MICallback(HMIDIIN hMidiIn, UINT wMsg, DWORD_PTR dwInstance, DWORD
             if(config.keymap[+cmkc] != 0) {
                 ui.printchars("\t mapped to KB #%c", config.keymap[+cmkc]);
 
+                /*
+                 * Modified to use hardware scan codes per this post
+                 * https://steamcommunity.com/app/960170/discussions/0/3413180683596311338/?ctp=2#c3423320123820173367
+                 */
                 INPUT input;
                 input.type = INPUT_KEYBOARD;
-                input.ki.wScan = 0;
                 input.ki.time = 0;
                 input.ki.dwExtraInfo = 0;
                 input.ki.wVk = config.keymap[+cmkc];
-                input.ki.dwFlags = cmkp ? 0 : KEYEVENTF_KEYUP;
+                input.ki.wScan = MapVirtualKey(input.ki.wVk, MAPVK_VK_TO_VSC);
+                input.ki.dwFlags = cmkp ? KEYEVENTF_SCANCODE : KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP;
 
                 SendInput(1, &input, sizeof(INPUT));
             } else {
