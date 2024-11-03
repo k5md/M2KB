@@ -86,7 +86,7 @@ HMIDIIN hMidiDevice;
 void CALLBACK MICallback(HMIDIIN hMidiIn, UINT wMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2) {
     if (wMsg == MIM_DATA) {
         cmkc = (dwParam1 & 0x0000ff00) >> 8;   // keycode
-        cmkp = (dwParam1 & 0x00ff0000) >> 16;  // key released if 0, else pressed
+        cmkp = ((dwParam1 & 0x00ff0000) >> 16) != 64;  // key released if 64, else pressed
 
         if (isConfigured) {
             if (cmkp) ui.print("Pressed  MIDI #%d", +cmkc);
