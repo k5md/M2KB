@@ -1,84 +1,24 @@
 #include <windows.h>
 #include <iostream>
 #include <conio.h>
-#include <fstream>
+
 #include <stdexcept>
 #include <locale.h>
-#include <curses.h>
 #include <string.h>
 #include <sstream>
 
+#include <map>
+#include "UI.h"
+#include "Config.h"
+
 #pragma comment(lib, "winmm.lib")
 
-struct UI {
-    WINDOW *keymapper_window;
-    int rows, cols;
-
-    WINDOW *create_window(int height, int width, int starty, int startx, const char* label) {
-        WINDOW* win;
-        WINDOW* actual_window;
-
-        win = newwin(height, width, starty, startx);
-        box(win, 0 , 0);
-
-        // add inner borders for label
-        mvwaddch(win, 2, 0, ACS_LTEE);
-        mvwhline(win, 2, 1, ACS_HLINE, width - 2);
-        mvwaddch(win, 2, width - 1, ACS_RTEE);
-
-        // print label in the middle
-        mvwprintw(win, 1, (width - strlen(label)) / 2 - startx, "%s", label);
-
-        wrefresh(win);
-
-        actual_window = newwin(height - 4, width - 2, starty + 3, startx + 1);
-        return actual_window;
-    }
-
-    UI() {
-        initscr();
-        cbreak();
-        keypad(stdscr, TRUE);
-
-        getmaxyx(stdscr, rows, cols);
-    
-        keymapper_window = create_window(rows, cols, 0, 0, "MIDI-device to keyboard mapper");
-        scrollok(keymapper_window, TRUE);
-    }
-
-    ~UI() {
-        endwin();
-    }
-
-    print(const char *message, ...) {
-        va_list args;
-
-        wscrl(keymapper_window, 1);
-        wmove(keymapper_window, rows - 5, 0);
-
-        va_start(args, message);
-        vwprintw(keymapper_window, message, args);
-        va_end(args);
-
-        wrefresh(keymapper_window);
-    }
-
-    printchars(const char *message, ...) {
-        va_list args;
-
-        va_start(args, message);
-        vwprintw(keymapper_window, message, args);
-        va_end(args);
-
-        wrefresh(keymapper_window); 
-    }
-};
-
 bool isConfigured = false;
-UI ui;
+UI ui = UI("MIDI-device to keyboard mapper");
+Config config;
+
 char cmkc; // current midi key code
 char cmkp; // is current midi key is pressed or released
-char *keymap = (char *) malloc(sizeof(char)*256); // idx is midi key code (0-127, typically), value is vk code (1-254)
 int currentDevice; // current midi device
 MMRESULT result;
 HMIDIIN hMidiDevice;
@@ -86,20 +26,21 @@ HMIDIIN hMidiDevice;
 void CALLBACK MICallback(HMIDIIN hMidiIn, UINT wMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2) {
     if (wMsg == MIM_DATA) {
         cmkc = (dwParam1 & 0x0000ff00) >> 8;   // keycode
-        cmkp = ((dwParam1 & 0x00ff0000) >> 16) != 64;  // key released if 64, else pressed
+        if (config.altcmkp == 0) cmkp = (dwParam1 & 0x00ff0000) >> 16;  // key released if 0, else pressed
+        else if (config.altcmkp == 1) cmkp = ((dwParam1 & 0x00ff0000) >> 16) != 64;  // key released if 64, else pressed
 
         if (isConfigured) {
             if (cmkp) ui.print("Pressed  MIDI #%d", +cmkc);
             if (!cmkp) ui.print("Released MIDI #%d", +cmkc);
-            if(keymap[+cmkc] != 0) {
-                ui.printchars("\t mapped to KB #%c", keymap[+cmkc]);
+            if(config.keymap[+cmkc] != 0) {
+                ui.printchars("\t mapped to KB #%c", config.keymap[+cmkc]);
 
                 INPUT input;
                 input.type = INPUT_KEYBOARD;
                 input.ki.wScan = 0;
                 input.ki.time = 0;
                 input.ki.dwExtraInfo = 0;
-                input.ki.wVk = keymap[+cmkc];
+                input.ki.wVk = config.keymap[+cmkc];
                 input.ki.dwFlags = cmkp ? 0 : KEYEVENTF_KEYUP;
 
                 SendInput(1, &input, sizeof(INPUT));
@@ -116,10 +57,6 @@ struct Keymapper {
         currentDevice = 0;
         cmkc = 0;
         cmkp = 0;
-        keymap = (char *)malloc(sizeof(char)*256);
-        for (size_t i=0; i < 255; i++) {
-            keymap[i] = 0;
-        }
         hMidiDevice = NULL;
     }
 
@@ -176,29 +113,26 @@ struct Keymapper {
         return;
     }
 
-    void saveConfig() {
-        std::ofstream out;
-        out.open("keymap.cfg");
-        if (out) out.write(keymap, 256);
-        out.close();
-        return;
-    }
-
-    void readConfig() {
-        std::ifstream in;
-        in.open("keymap.cfg");
-        if (in) in.getline(keymap, 256);
-        in.close();
-        return;
-    }
-
     void printConfig() {
-        ui.print("Current config in keymap.cfg:");
+        ui.print("Current keymap:");
         for(size_t i = 0; i < 255; ++i) {
-            if (keymap[i] != 0) {
-                ui.print("\t MIDI #%d : KB #%d", i, keymap[i]);
+            if (config.keymap[i] != 0) {
+                ui.print("\t MIDI #%d : KB #%d", i, config.keymap[i]);
             }
         }
+        ui.print("Current config:");
+        for(const auto &fieldPair : config.getEntries()) {
+            ui.print("\t%s:\t%s", fieldPair.first.c_str(), fieldPair.second.c_str());
+        }
+        return;
+    }
+
+    void changeSettings() {
+        char vkCode;
+        ui.print("Use alternative key release detection? Type \"Y\" or \"y\" to confirm");
+        vkCode = _getch();
+        config.altcmkp = (vkCode == 'Y' || vkCode == 'y');
+        config.save();
         return;
     }
 
@@ -207,7 +141,7 @@ struct Keymapper {
         char vkCode;
         ui.print("To stop press Escape");
         ui.print("Press key to be emulated on the keyboard, then MIDI-key");
-        while(true) {
+        while (true) {
             Sleep(100);
             vkCode = _getch();
             if (vkCode == VK_ESCAPE) break;
@@ -222,10 +156,10 @@ struct Keymapper {
                 }
                 midiKey = cmkc;
                 ui.printchars("MIDI: %d", midiKey);
-                keymap[+midiKey] = +vkCode;
+                config.keymap[+midiKey] = +vkCode;
             }
         }
-        saveConfig();
+        config.save();
         return;
     }
 
@@ -235,14 +169,19 @@ struct Keymapper {
     }
 };
 
-
 int main() {
+    config = Config();
+    config.load();
     Keymapper keymapper = Keymapper();
-
     keymapper.selectActiveDevice();
-    keymapper.readConfig();
     keymapper.printConfig();
     keymapper.listen();
+
+    ui.print("Change settings? Type \"Y\" or \"y\" to confirm");
+    char changeSettings = _getch();
+    if (changeSettings == 'Y' || changeSettings == 'y') {
+        keymapper.changeSettings();
+    }
 
     ui.print("Reassign mappings? Type \"Y\" or \"y\" to confirm");
     char reassign = _getch();
@@ -253,13 +192,13 @@ int main() {
     isConfigured = true;
 
     ui.print("Started mapping...");
-    while(true) {
+    while (true) {
         int c = _getch();
         if (c == VK_ESCAPE) break;
     }
 
     keymapper.~Keymapper();
-    free(keymap);
+    config.~Config();
     ui.~UI();
     return 0;
 }
