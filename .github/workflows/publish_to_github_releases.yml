@@ -2,23 +2,23 @@ name: Publish to Github Releases
 
 on:
   push:
-    branches: 
-      - master
-
-permissions:
-  contents: read
+    tags:
+      - "v*.*.*"
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+        contents: write
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@v4
       - name: Build the Docker image
         run: make build
       - name: Package artefacts
         run: make package
       - name: Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
+        env: 
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           files: ./artefacts/M2KB.zip

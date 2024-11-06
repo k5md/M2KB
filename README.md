@@ -21,4 +21,4 @@ You can either build this app yourself from source or download a precompiled bin
 Only Windows is supported.
 
 ## Dependencies
-This program uses [PDCurses](https://pdcurses.org/)
+This program uses [PDCurses](https://pdcurses.org/) and [inifile-cpp](https://github.com/Rookfighter/inifile-cpp)
