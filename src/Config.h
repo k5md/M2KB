@@ -5,15 +5,14 @@
 #include <string.h>
 #include <map>
 struct Config {
-    std::string configPath = "config.ini";
-    std::string keymapPath = "keymap.cfg";
+    std::string configPath;
+    std::string keymapPath;
     int altcmkp = 0;
-    char keymap[256];
+    char keymap[256]; // idx is midi key code (0-127, typically), value is vk code (1-254)
 
-    Config() {
-        for (size_t i = 0; i < 255; i++) {
-            keymap[i] = 0; // idx is midi key code (0-127, typically), value is vk code (1-254)
-        }
+    void use(std::string configPath, std::string keymapPath) {
+        this->configPath = configPath;
+        this->keymapPath = keymapPath;
     }
 
     void save() {
@@ -25,7 +24,6 @@ struct Config {
         out.open(keymapPath);
         if (out) out.write(keymap, 256);
         out.close();
-        return;
     }
 
     void load() {
@@ -33,14 +31,16 @@ struct Config {
         storage.load(configPath);
         if (storage["Compatibility"]["altcmkp"].as<std::string>() != "") altcmkp = storage["Compatibility"]["altcmkp"].as<int>();
 
+        for (size_t i = 0; i < 255; i++) {
+            keymap[i] = 0;
+        }
         std::ifstream in;
         in.open(keymapPath);
         if (in) in.getline(keymap, 256);
         in.close();
-        return;
     }
 
-    auto getEntries() {
+    auto repr() {
         std::map<std::string, std::string> entries = {
             { "altcmkp",  std::to_string(altcmkp) },
         };
