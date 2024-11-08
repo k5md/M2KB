@@ -85,6 +85,7 @@ class Keymapper {
 
         void changeSettings() {
             config.altcmkp = question(ui, "Use alternative key release detection? (y/n)");
+            config.hwsc = question(ui, "Use hardware scan codes? (y/n)");
             config.save();
         }
 
@@ -137,11 +138,16 @@ class Keymapper {
             }
             INPUT input;
             input.type = INPUT_KEYBOARD;
-            input.ki.wScan = 0;
             input.ki.time = 0;
             input.ki.dwExtraInfo = 0;
             input.ki.wVk = config.keymap[+cmkc];
-            input.ki.dwFlags = cmkp ? 0 : KEYEVENTF_KEYUP;
+            if (config.hwsc) {
+                input.ki.wScan = MapVirtualKey(input.ki.wVk, MAPVK_VK_TO_VSC);
+                input.ki.dwFlags = cmkp ? KEYEVENTF_SCANCODE : KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP;
+            } else {
+                input.ki.wScan = 0;
+                input.ki.dwFlags = cmkp ? 0 : KEYEVENTF_KEYUP;
+            }
             SendInput(1, &input, sizeof(INPUT));
         }
 
