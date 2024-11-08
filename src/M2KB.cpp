@@ -6,7 +6,6 @@
 #include <string.h>
 #include <sstream>
 #include <map>
-#include <functional>
 #include "UI.h"
 #include "UIExtensions.h"
 #include "Config.h"
@@ -18,19 +17,11 @@ class Keymapper {
         UI ui = UI("MIDI-device to keyboard mapper");
         Config config;
 
-        int currentDevice; // current midi device
-        char cmkc; // current midi key code
-        char cmkp; // is current midi key is pressed or released
-        HMIDIIN hMidiDevice;
-        bool mapping;
-        
-        Keymapper () {
-            currentDevice = -1;
-            cmkc = 0;
-            cmkp = 0;
-            hMidiDevice = NULL;
-            mapping = false;
-        }
+        int currentDevice = -1; // current midi device
+        char cmkc = 0; // current midi key code
+        char cmkp = 0; // is current midi key is pressed or released
+        HMIDIIN hMidiDevice = NULL;
+        bool mapping = false;
 
         ~Keymapper () {
             mapping = false;
@@ -124,32 +115,41 @@ class Keymapper {
             return;
         }
 
+        void reportKey(HMIDIIN hMidiIn, UINT wMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2) {
+            if (wMsg != MIM_DATA || !mapping) return;
+            if (cmkp) ui.print("Pressed  MIDI #%d", +cmkc);
+            if (!cmkp) ui.print("Released MIDI #%d", +cmkc);
+            if(config.keymap[+cmkc] != 0) ui.printchars("\t mapped to KB #%c", config.keymap[+cmkc]);
+        }
+
+        void extractKey(HMIDIIN hMidiIn, UINT wMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2) {
+            if (wMsg != MIM_DATA) return;
+            cmkc = (dwParam1 & 0x0000ff00) >> 8; // keycode
+            if (config.altcmkp == 0) cmkp = (dwParam1 & 0x00ff0000) >> 16; // key released if 0, else pressed
+            else if (config.altcmkp == 1) cmkp = ((dwParam1 & 0x00ff0000) >> 16) != 64; // key released if 64, else pressed
+        }
+
+        void mapKey(HMIDIIN hMidiIn, UINT wMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2) {
+            if (wMsg != MIM_DATA || !mapping) return;
+            if (config.keymap[+cmkc] == 0) {
+                std::cout << std::endl;
+                return;
+            }
+            INPUT input;
+            input.type = INPUT_KEYBOARD;
+            input.ki.wScan = 0;
+            input.ki.time = 0;
+            input.ki.dwExtraInfo = 0;
+            input.ki.wVk = config.keymap[+cmkc];
+            input.ki.dwFlags = cmkp ? 0 : KEYEVENTF_KEYUP;
+            SendInput(1, &input, sizeof(INPUT));
+        }
+
         static void CALLBACK MICallback(HMIDIIN hMidiIn, UINT wMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2) {
             Keymapper* keymapper = reinterpret_cast <Keymapper*>(dwInstance);
-            if (wMsg == MIM_DATA) {
-                keymapper->cmkc = (dwParam1 & 0x0000ff00) >> 8;   // keycode
-                if (keymapper->config.altcmkp == 0) keymapper->cmkp = (dwParam1 & 0x00ff0000) >> 16;  // key released if 0, else pressed
-                else if (keymapper->config.altcmkp == 1) keymapper->cmkp = ((dwParam1 & 0x00ff0000) >> 16) != 64;  // key released if 64, else pressed
-                if (keymapper->mapping) {
-                    if (keymapper->cmkp) keymapper->ui.print("Pressed  MIDI #%d", +keymapper->cmkc);
-                    if (!keymapper->cmkp) keymapper->ui.print("Released MIDI #%d", +keymapper->cmkc);
-                    if(keymapper->config.keymap[+keymapper->cmkc] != 0) {
-                        keymapper->ui.printchars("\t mapped to KB #%c", keymapper->config.keymap[+keymapper->cmkc]);
-
-                        INPUT input;
-                        input.type = INPUT_KEYBOARD;
-                        input.ki.wScan = 0;
-                        input.ki.time = 0;
-                        input.ki.dwExtraInfo = 0;
-                        input.ki.wVk = config.keymap[+keymapper->cmkc];
-                        input.ki.dwFlags = cmkp ? 0 : KEYEVENTF_KEYUP;
-
-                        SendInput(1, &input, sizeof(INPUT));
-                    } else {
-                        std::cout << std::endl;
-                    } 
-                }
-            }
+            keymapper->extractKey(hMidiIn, wMsg, dwInstance, dwParam1, dwParam2);
+            keymapper->mapKey(hMidiIn, wMsg, dwInstance, dwParam1, dwParam2);
+            keymapper->reportKey(hMidiIn, wMsg, dwInstance, dwParam1, dwParam2);
         }
 
         void listen() {
